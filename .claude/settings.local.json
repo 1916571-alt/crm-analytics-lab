@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python:*)",
+      "Bash(dir /B \"C:\\\\vscode\\\\CRM_ANALYTICS_LAB\\\\crm-analytics-lab\\\\learning\")",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl:*)",
+      "Bash(pip show:*)",
+      "Bash(findstr:*)",
+      "Bash(streamlit run:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
