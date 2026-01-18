@@ -33,24 +33,21 @@ QUESTIONS = [
         - 첫 단계(page_view) 대비 전환율 (%)
         - 결과 컬럼: `step`, `users`, `conversion_rate`
         """,
-        hint="""
-        **힌트:**
-        1. 각 event_type별 고유 user_id 수를 계산
-        2. page_view의 사용자 수를 기준으로 전환율 계산
-        3. CASE WHEN으로 순서를 지정하면 좋습니다
-
-        ```sql
-        WITH funnel AS (
-            SELECT
-                event_type,
-                COUNT(DISTINCT user_id) as users
-            FROM events
-            WHERE event_type IN ('page_view', 'product_view', ...)
-            GROUP BY event_type
-        )
-        SELECT ...
-        ```
-        """,
+        hint="""각 단계별 고유 사용자 수를 먼저 구하고,
+첫 단계(page_view) 대비 비율로 전환율을 계산합니다.
+---
+필요한 함수: COUNT(DISTINCT), GROUP BY, CASE WHEN
+page_view 사용자 수를 서브쿼리나 CTE로 가져와서 나눕니다.
+---
+WITH funnel AS (
+    SELECT event_type as step, COUNT(DISTINCT user_id) as users
+    FROM events
+    WHERE event_type IN ('page_view', 'product_view', 'add_to_cart', 'purchase')
+    GROUP BY event_type
+),
+total AS (SELECT users as total_users FROM funnel WHERE step = 'page_view')
+SELECT f.step, f.users, ROUND(f.users * 100.0 / t.total_users, 2) as conversion_rate
+FROM funnel f, total t""",
         answer_query="""
 WITH funnel AS (
     SELECT
@@ -120,19 +117,22 @@ ORDER BY
         - 이전 단계 대비 이탈률 (drop_off_rate)
         - 결과 컬럼: `step`, `users`, `prev_users`, `drop_off_rate`
         """,
-        hint="""
-        **힌트:**
-        1. LAG() 윈도우 함수로 이전 단계 사용자 수 가져오기
-        2. 이탈률 = (이전 단계 - 현재 단계) / 이전 단계 × 100
-
-        ```sql
-        SELECT
-            step,
-            users,
-            LAG(users) OVER (ORDER BY step_order) as prev_users,
-            ...
-        ```
-        """,
+        hint="""이탈률 = (이전 단계 사용자 - 현재 단계 사용자) / 이전 단계 사용자 × 100
+이전 단계 값을 가져와야 합니다.
+---
+LAG() 윈도우 함수: 이전 행의 값을 가져옴
+LAG(users) OVER (ORDER BY step_order) → 이전 단계 사용자 수
+---
+WITH funnel AS (
+    SELECT event_type as step, COUNT(DISTINCT user_id) as users,
+           CASE event_type WHEN 'page_view' THEN 1 WHEN 'product_view' THEN 2
+                           WHEN 'add_to_cart' THEN 3 WHEN 'purchase' THEN 4 END as step_order
+    FROM events WHERE event_type IN ('page_view','product_view','add_to_cart','purchase')
+    GROUP BY event_type
+)
+SELECT step, users, LAG(users) OVER (ORDER BY step_order) as prev_users,
+       ROUND((LAG(users) OVER (ORDER BY step_order) - users) * 100.0 / LAG(users) OVER (ORDER BY step_order), 2) as drop_off_rate
+FROM funnel""",
         answer_query="""
 WITH funnel AS (
     SELECT
@@ -203,16 +203,21 @@ ORDER BY step_order
         - 결과 컬럼: `device`, `step`, `users`, `conversion_rate`
         - 디바이스, 단계 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        1. device와 event_type으로 그룹화
-        2. 각 디바이스의 page_view 수를 기준으로 전환율 계산
-        3. 윈도우 함수 FIRST_VALUE 또는 서브쿼리 활용
-
-        ```sql
-        FIRST_VALUE(users) OVER (PARTITION BY device ORDER BY step_order)
-        ```
-        """,
+        hint="""device와 event_type 두 가지로 그룹화해서
+디바이스별로 각각 첫 단계 대비 전환율을 계산합니다.
+---
+PARTITION BY device: 디바이스별로 따로 계산
+FIRST_VALUE(): 각 파티션의 첫 번째 값 (page_view 사용자 수)
+---
+SELECT device, step, users,
+       ROUND(users * 100.0 / FIRST_VALUE(users) OVER (PARTITION BY device ORDER BY step_order), 2) as conversion_rate
+FROM (
+    SELECT device, event_type as step, COUNT(DISTINCT user_id) as users,
+           CASE event_type WHEN 'page_view' THEN 1 WHEN 'product_view' THEN 2
+                           WHEN 'add_to_cart' THEN 3 WHEN 'purchase' THEN 4 END as step_order
+    FROM events WHERE event_type IN ('page_view','product_view','add_to_cart','purchase')
+    GROUP BY device, event_type
+)""",
         answer_query="""
 WITH funnel AS (
     SELECT
@@ -283,12 +288,23 @@ ORDER BY device, step_order
         - 이탈률이 가장 높은 단계 식별
         - 결과: 병목 단계명, 이탈률, 이탈 사용자 수
         """,
-        hint="""
-        **힌트:**
-        1. 먼저 단계별 이탈률을 계산하는 CTE
-        2. MAX(이탈률)에 해당하는 단계 선택
-        3. 또는 ORDER BY + LIMIT 1 사용
-        """,
+        hint="""먼저 단계별 이탈률을 계산하고,
+가장 높은 이탈률을 가진 단계를 찾습니다.
+---
+이탈률 계산 후 ORDER BY drop_off_rate DESC LIMIT 1
+또는 WHERE drop_off_rate = (SELECT MAX(drop_off_rate) ...)
+---
+WITH funnel AS (...이전 문제와 동일...),
+with_dropoff AS (
+    SELECT step, users,
+           LAG(users) OVER (ORDER BY step_order) - users as dropped_users,
+           ROUND((LAG(users) OVER (...) - users) * 100.0 / LAG(users) OVER (...), 2) as drop_off_rate
+    FROM funnel
+)
+SELECT step as bottleneck_step, drop_off_rate, dropped_users
+FROM with_dropoff
+WHERE drop_off_rate IS NOT NULL
+ORDER BY drop_off_rate DESC LIMIT 1""",
         answer_query="""
 WITH funnel AS (
     SELECT
@@ -371,16 +387,20 @@ LIMIT 1
         - 결과 컬럼: `hour`, `page_views`, `purchases`, `conversion_rate`
         - 시간 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        1. strftime('%H', event_date)로 시간 추출
-        2. CASE WHEN으로 이벤트 타입별 집계
-        3. 같은 시간대에 page_view와 purchase를 함께 집계
-
-        ```sql
-        SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END)
-        ```
-        """,
+        hint="""시간대별로 그룹화하고, 각 시간대에서
+page_view와 purchase 사용자 수를 각각 집계합니다.
+---
+strftime('%H', event_date): 시간(00-23) 추출
+CASE WHEN + COUNT(DISTINCT): 조건별 고유 사용자 수
+NULLIF(x, 0): 0으로 나누기 방지
+---
+SELECT strftime('%H', event_date) as hour,
+       COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN user_id END) as page_views,
+       COUNT(DISTINCT CASE WHEN event_type = 'purchase' THEN user_id END) as purchases,
+       ROUND(purchases * 100.0 / NULLIF(page_views, 0), 2) as conversion_rate
+FROM events
+WHERE event_type IN ('page_view', 'purchase')
+GROUP BY hour ORDER BY hour""",
         answer_query="""
 SELECT
     strftime('%H', event_date) as hour,

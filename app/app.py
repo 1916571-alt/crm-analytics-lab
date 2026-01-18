@@ -7,6 +7,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from pathlib import Path
+from components.progress_manager import init_progress_table, load_all_progress, get_completed_count
 
 # 페이지 설정
 st.set_page_config(
@@ -94,11 +95,25 @@ def execute_query(query: str) -> tuple[pd.DataFrame | None, str | None]:
         return None, str(e)
 
 def init_session_state():
-    """세션 상태 초기화"""
-    if 'completed_questions' not in st.session_state:
+    """세션 상태 초기화 및 저장된 진행 데이터 로드"""
+    # DB 테이블 초기화 (없으면 생성)
+    if DB_PATH.exists():
+        init_progress_table()
+
+    # 첫 로드 시에만 DB에서 진행 데이터 불러오기
+    if 'initialized' not in st.session_state:
+        st.session_state.initialized = True
         st.session_state.completed_questions = {}
-    if 'user_queries' not in st.session_state:
         st.session_state.user_queries = {}
+
+        # DB에서 진행 데이터 로드
+        if DB_PATH.exists():
+            progress_data = load_all_progress()
+            for qid, progress in progress_data.items():
+                if progress.is_completed:
+                    st.session_state.completed_questions[qid] = True
+                if progress.last_query:
+                    st.session_state.user_queries[qid] = progress.last_query
 
 def main():
     init_session_state()
@@ -118,6 +133,7 @@ def main():
             "모듈 선택",
             options=[
                 "🏠 홈",
+                "📖 개념 학습",
                 "💰 LTV & CAC",
                 "🔄 Funnel 분석",
                 "📅 Cohort 분석",
@@ -164,6 +180,9 @@ def main():
     # 메인 콘텐츠
     if module == "🏠 홈":
         show_home()
+    elif module == "📖 개념 학습":
+        from modules.concepts import show_concepts_module
+        show_concepts_module()
     elif module == "💰 LTV & CAC":
         from modules.ltv_cac import show_ltv_cac_module
         show_ltv_cac_module()
@@ -192,6 +211,8 @@ def show_home():
     > **직접 SQL을 작성**하여 CRM 핵심 지표를 산출하고,
     > 데이터 기반 의사결정 역량을 키우세요.
     """)
+
+    st.info("**처음이신가요?** 왼쪽 메뉴에서 `📖 개념 학습`을 먼저 확인하세요. AARRR 프레임워크, 지표 관계도 등 실습 전 알아야 할 핵심 개념을 정리했습니다.")
 
     st.divider()
 

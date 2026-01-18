@@ -8,6 +8,8 @@ import sqlite3
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
+from components.progress_manager import save_progress, get_progress
+from components.result_checker import check_result, CheckStatus
 
 DB_PATH = Path(__file__).parent.parent.parent / "learning" / "data" / "crm.db"
 
@@ -46,8 +48,12 @@ class QuestionCard:
         # 난이도 표시
         difficulty_stars = "⭐" * q.difficulty
 
+        # 완료 상태 확인
+        is_already_completed = self.key in st.session_state.get('completed_questions', {})
+        completed_badge = " ✅" if is_already_completed else ""
+
         # 제목
-        st.markdown(f"### {q.title} {difficulty_stars}")
+        st.markdown(f"### {q.title} {difficulty_stars}{completed_badge}")
 
         # 문제 설명
         st.markdown(f"""
@@ -57,16 +63,22 @@ class QuestionCard:
         </div>
         """, unsafe_allow_html=True)
 
-        # 힌트 (접기/펼치기)
-        with st.expander("💡 힌트 보기", expanded=False):
-            st.markdown(q.hint)
+        # 단계별 힌트
+        self._render_step_hints(q.hint)
 
         # SQL 에디터
         st.markdown("**✏️ SQL 작성**")
 
+        # 저장된 쿼리 불러오기 (세션 또는 DB에서)
+        saved_query = ""
+        if f"query_{self.key}" in st.session_state:
+            saved_query = st.session_state.get(f"query_{self.key}", "")
+        elif self.key in st.session_state.get('user_queries', {}):
+            saved_query = st.session_state.user_queries[self.key]
+
         query = st.text_area(
             "SQL 입력",
-            value=st.session_state.get(f"query_{self.key}", ""),
+            value=saved_query,
             height=180,
             key=f"editor_{self.key}",
             label_visibility="collapsed",
@@ -125,18 +137,41 @@ class QuestionCard:
             # 정답 쿼리 실행
             answer_df, _ = self._execute_query(q.answer_query)
 
-            # 정답 비교
+            # 결과 기반 채점
             user_result = st.session_state.get(f"result_{self.key}")
+            check_result_obj = check_result(user_result, answer_df)
 
-            if user_result is not None and answer_df is not None:
-                is_correct = self._compare_results(user_result, answer_df)
+            # 채점 결과 표시
+            if check_result_obj.status == CheckStatus.CORRECT:
+                st.success(f"🎉 {check_result_obj.message}")
+                is_correct = True
+                # 완료 표시 (세션 + DB 저장)
+                st.session_state.completed_questions[self.key] = True
+                save_progress(self.key, is_completed=True, query=query)
 
-                if is_correct:
-                    st.success("🎉 정답입니다!")
-                    # 완료 표시
-                    st.session_state.completed_questions[self.key] = True
-                else:
-                    st.warning("❌ 결과가 다릅니다. 다시 시도해보세요.")
+            elif check_result_obj.status == CheckStatus.PARTIAL:
+                st.warning(f"⚠️ {check_result_obj.message}")
+                # 부분 점수 진행바
+                st.progress(check_result_obj.score / 100)
+                # 상세 피드백
+                with st.expander("📋 상세 피드백", expanded=True):
+                    for detail in check_result_obj.details:
+                        st.markdown(f"- {detail}")
+                # 오답 저장
+                save_progress(self.key, is_completed=False, query=query)
+
+            elif check_result_obj.status == CheckStatus.WRONG:
+                st.error(f"❌ {check_result_obj.message}")
+                # 상세 피드백
+                if check_result_obj.details:
+                    with st.expander("📋 상세 피드백", expanded=True):
+                        for detail in check_result_obj.details:
+                            st.markdown(f"- {detail}")
+                # 오답 저장
+                save_progress(self.key, is_completed=False, query=query)
+
+            else:  # ERROR
+                st.info(f"ℹ️ {check_result_obj.message}")
 
             # 정답 쿼리
             with st.expander("📝 정답 쿼리", expanded=True):
@@ -164,6 +199,99 @@ class QuestionCard:
 
         return is_correct
 
+    def _render_step_hints(self, hint: str):
+        """
+        단계별 힌트 렌더링
+
+        힌트 형식:
+        - "---" 구분자로 단계 분리
+        - 구분자가 없으면 단일 힌트로 표시
+
+        단계별 제목:
+        - 1단계: 접근 방향
+        - 2단계: 필요한 함수/문법
+        - 3단계: 쿼리 뼈대
+        """
+        # 힌트 단계 분리
+        steps = self._parse_hint_steps(hint)
+        total_steps = len(steps)
+
+        # 단계별 제목
+        step_titles = [
+            "🎯 1단계: 접근 방향",
+            "🔧 2단계: 필요한 함수/문법",
+            "📝 3단계: 쿼리 뼈대"
+        ]
+
+        # 현재 공개된 힌트 단계 (세션 상태)
+        hint_key = f"hint_step_{self.key}"
+        if hint_key not in st.session_state:
+            st.session_state[hint_key] = 0  # 0 = 힌트 미공개
+
+        current_step = st.session_state[hint_key]
+
+        # 힌트 컨테이너
+        with st.container():
+            # 힌트 버튼
+            col1, col2, col3 = st.columns([1, 1, 3])
+
+            with col1:
+                if current_step < total_steps:
+                    next_step_label = f"💡 힌트 {current_step + 1}/{total_steps}"
+                    if st.button(next_step_label, key=f"hint_btn_{self.key}"):
+                        st.session_state[hint_key] = current_step + 1
+                        st.rerun()
+                else:
+                    st.caption(f"💡 힌트 {total_steps}/{total_steps} (모두 공개)")
+
+            with col2:
+                if current_step > 0:
+                    if st.button("🔒 힌트 숨기기", key=f"hint_hide_{self.key}"):
+                        st.session_state[hint_key] = 0
+                        st.rerun()
+
+            # 공개된 힌트 표시
+            if current_step > 0:
+                for i in range(current_step):
+                    step_title = step_titles[i] if i < len(step_titles) else f"💡 힌트 {i + 1}"
+                    step_content = steps[i] if i < len(steps) else ""
+
+                    # 단계별 색상
+                    colors = ["#FEF3C7", "#DBEAFE", "#E0E7FF"]  # 노랑, 파랑, 보라
+                    border_colors = ["#F59E0B", "#3B82F6", "#6366F1"]
+
+                    bg_color = colors[i % len(colors)]
+                    border_color = border_colors[i % len(border_colors)]
+
+                    st.markdown(f"""
+                    <div style="background-color: {bg_color}; color: #1F2937; padding: 0.75rem 1rem;
+                                border-radius: 0.5rem; margin: 0.5rem 0; border-left: 4px solid {border_color};">
+                        <strong>{step_title}</strong><br>
+                        <span style="white-space: pre-wrap;">{step_content}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+    def _parse_hint_steps(self, hint: str) -> list[str]:
+        """
+        힌트 문자열을 단계별로 분리
+
+        구분자: "---" 또는 "## Step" 또는 "**1단계**" 등
+        """
+        # "---" 구분자로 분리
+        if "---" in hint:
+            steps = [s.strip() for s in hint.split("---") if s.strip()]
+            return steps
+
+        # "## " 헤더로 분리
+        if "## " in hint:
+            import re
+            parts = re.split(r'\n## ', hint)
+            steps = [p.strip() for p in parts if p.strip()]
+            return steps
+
+        # 구분자 없으면 단일 힌트
+        return [hint.strip()]
+
     def _execute_query(self, query: str) -> tuple[pd.DataFrame | None, str | None]:
         """SQL 쿼리 실행"""
         try:
@@ -174,39 +302,3 @@ class QuestionCard:
         except Exception as e:
             return None, str(e)
 
-    def _compare_results(self, user_df: pd.DataFrame, answer_df: pd.DataFrame) -> bool:
-        """결과 비교"""
-        if user_df is None or answer_df is None:
-            return False
-
-        # 행 수 비교
-        if len(user_df) != len(answer_df):
-            return False
-
-        # 컬럼 수 비교
-        if len(user_df.columns) != len(answer_df.columns):
-            return False
-
-        # 값 비교 (숫자는 반올림)
-        try:
-            user_sorted = user_df.copy()
-            answer_sorted = answer_df.copy()
-
-            # 숫자 컬럼 반올림
-            for col in user_sorted.select_dtypes(include=['float64', 'float32']).columns:
-                user_sorted[col] = user_sorted[col].round(2)
-
-            for col in answer_sorted.select_dtypes(include=['float64', 'float32']).columns:
-                answer_sorted[col] = answer_sorted[col].round(2)
-
-            # 값만 비교 (컬럼명 무시)
-            user_values = user_sorted.values.tolist()
-            answer_values = answer_sorted.values.tolist()
-
-            # 정렬 후 비교
-            user_values.sort(key=str)
-            answer_values.sort(key=str)
-
-            return user_values == answer_values
-        except Exception:
-            return False

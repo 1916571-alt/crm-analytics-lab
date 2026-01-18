@@ -29,21 +29,19 @@ QUESTIONS = [
         - 결과 컬럼명: `avg_ltv`
         - 소수점 둘째자리까지 반올림
         """,
-        hint="""
-        **힌트:**
-        1. 먼저 고객별 총 구매액을 구하는 서브쿼리를 작성하세요
-        2. WITH절(CTE)을 사용하면 깔끔합니다
-        3. ROUND() 함수로 반올림하세요
-
-        ```sql
-        WITH customer_revenue AS (
-            SELECT customer_id, SUM(amount) as total_revenue
-            FROM transactions
-            GROUP BY customer_id
-        )
-        SELECT ...
-        ```
-        """,
+        hint="""고객별 총 구매액을 먼저 구하고, 그 평균을 계산하세요.
+두 단계로 나눠서 생각하면 됩니다.
+---
+필요한 함수: SUM(), AVG(), GROUP BY, ROUND()
+CTE(WITH절)를 사용하면 코드가 깔끔해집니다.
+---
+WITH customer_revenue AS (
+    SELECT customer_id, SUM(amount) as total_revenue
+    FROM transactions
+    GROUP BY customer_id
+)
+SELECT ROUND(AVG(total_revenue), 2) as avg_ltv
+FROM customer_revenue""",
         answer_query="""
 WITH customer_revenue AS (
     SELECT
@@ -99,22 +97,20 @@ FROM customer_revenue
         - 결과 컬럼: `channel`, `total_spend`, `total_conversions`, `cac`
         - CAC가 낮은 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        1. campaigns 테이블을 channel로 그룹화하세요
-        2. SUM(spend), SUM(conversions)를 계산
-        3. CAC = 총 비용 / 총 전환 수
-
-        ```sql
-        SELECT
-            channel,
-            SUM(spend) as total_spend,
-            SUM(conversions) as total_conversions,
-            ...
-        FROM campaigns
-        GROUP BY channel
-        ```
-        """,
+        hint="""채널별로 그룹화해서 총 비용과 총 전환 수를 구하세요.
+CAC = 총 비용 / 총 전환 수 입니다.
+---
+필요한 함수: SUM(), GROUP BY, ORDER BY
+SQLite에서 정수 나눗셈 주의: * 1.0을 곱해서 실수로 변환하세요.
+---
+SELECT
+    channel,
+    SUM(spend) as total_spend,
+    SUM(conversions) as total_conversions,
+    ROUND(SUM(spend) * 1.0 / SUM(conversions), 2) as cac
+FROM campaigns
+GROUP BY channel
+ORDER BY cac ASC""",
         answer_query="""
 SELECT
     channel,
@@ -171,30 +167,25 @@ ORDER BY cac ASC
         - 비율이 높은 순으로 정렬
         - 결과 컬럼: `channel`, `avg_ltv`, `cac`, `ltv_cac_ratio`
         """,
-        hint="""
-        **힌트:**
-        1. 두 개의 CTE를 만드세요:
-           - channel_ltv: 채널별 평균 LTV
-           - channel_cac: 채널별 CAC
-        2. 두 CTE를 JOIN하세요
-
-        ```sql
-        WITH channel_ltv AS (
-            SELECT c.acquisition_channel as channel, ...
-            FROM customers c
-            JOIN transactions t ON c.customer_id = t.customer_id
-            GROUP BY c.acquisition_channel
-        ),
-        channel_cac AS (
-            SELECT channel, ...
-            FROM campaigns
-            GROUP BY channel
-        )
-        SELECT ...
-        FROM channel_ltv l
-        JOIN channel_cac c ON l.channel = c.channel
-        ```
-        """,
+        hint="""두 가지 정보를 각각 구해서 합쳐야 합니다:
+1) 채널별 평균 LTV (customers + transactions)
+2) 채널별 CAC (campaigns)
+---
+필요한 개념: CTE 2개 만들기, JOIN
+channel_ltv와 channel_cac 두 개의 CTE를 만들고 JOIN하세요.
+---
+WITH channel_ltv AS (
+    SELECT c.acquisition_channel as channel,
+           ROUND(SUM(t.amount) * 1.0 / COUNT(DISTINCT c.customer_id), 2) as avg_ltv
+    FROM customers c JOIN transactions t ON c.customer_id = t.customer_id
+    GROUP BY c.acquisition_channel
+),
+channel_cac AS (
+    SELECT channel, ROUND(SUM(spend) * 1.0 / SUM(conversions), 2) as cac
+    FROM campaigns GROUP BY channel
+)
+SELECT l.channel, l.avg_ltv, c.cac, ROUND(l.avg_ltv / c.cac, 2) as ltv_cac_ratio
+FROM channel_ltv l JOIN channel_cac c ON l.channel = c.channel""",
         answer_query="""
 WITH channel_ltv AS (
     SELECT
@@ -270,17 +261,23 @@ ORDER BY ltv_cac_ratio DESC
         - 결과 컬럼: `channel`, `monthly_revenue_per_customer`, `cac`, `payback_months`
         - 회수 기간이 짧은 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        1. 고객별 활동 기간(월)을 계산하세요
-        2. 고객별 총 매출 / 활동 월수 = 월평균 매출
-        3. 채널별로 집계 후 CAC와 계산
-
-        활동 기간 계산 예시:
-        ```sql
-        (julianday(MAX(transaction_date)) - julianday(MIN(transaction_date))) / 30.0 + 1
-        ```
-        """,
+        hint="""Payback = CAC / 월평균 매출
+먼저 고객별 활동 기간(월)과 월평균 매출을 구해야 합니다.
+---
+활동 기간 계산: julianday() 함수로 날짜 차이 계산
+(MAX날짜 - MIN날짜) / 30 + 1 = 활동 월수
+CASE WHEN으로 거래가 1건인 경우 처리
+---
+WITH customer_monthly AS (
+    SELECT c.customer_id, c.acquisition_channel as channel,
+           SUM(t.amount) as total_revenue,
+           CASE WHEN COUNT(t.transaction_id) = 1 THEN 1
+                ELSE (julianday(MAX(t.transaction_date)) - julianday(MIN(t.transaction_date))) / 30.0 + 1
+           END as months_active
+    FROM customers c JOIN transactions t ON c.customer_id = t.customer_id
+    GROUP BY c.customer_id, c.acquisition_channel
+)
+-- 이후 채널별로 집계하고 CAC와 JOIN""",
         answer_query="""
 WITH customer_monthly AS (
     SELECT
@@ -369,14 +366,29 @@ ORDER BY payback_months ASC
         - 결과 컬럼: `channel`, `total_revenue`, `total_cost`, `customers`, `ltv`, `cac`, `roi_percent`
         - ROI가 높은 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        1. 채널별 총 매출 (customers + transactions)
-        2. 채널별 총 비용 (campaigns)
-        3. ROI = (LTV - CAC) / CAC × 100
-
-        각각의 CTE를 만들어 JOIN하세요.
-        """,
+        hint="""ROI = (LTV - CAC) / CAC × 100
+채널별 총 매출과 총 비용을 각각 구해야 합니다.
+---
+필요한 CTE:
+1) channel_revenue: 채널별 총 매출, 고객 수
+2) channel_cost: 채널별 총 비용, 획득 고객 수
+---
+WITH channel_revenue AS (
+    SELECT c.acquisition_channel as channel,
+           COUNT(DISTINCT c.customer_id) as customers,
+           SUM(t.amount) as total_revenue
+    FROM customers c JOIN transactions t ON c.customer_id = t.customer_id
+    GROUP BY c.acquisition_channel
+),
+channel_cost AS (
+    SELECT channel, SUM(spend) as total_cost, SUM(conversions) as acquired_customers
+    FROM campaigns GROUP BY channel
+)
+SELECT r.channel, r.total_revenue, c.total_cost, r.customers,
+       ROUND(r.total_revenue * 1.0 / r.customers, 2) as ltv,
+       ROUND(c.total_cost * 1.0 / c.acquired_customers, 2) as cac,
+       ROUND(((ltv - cac) / cac) * 100, 1) as roi_percent
+FROM channel_revenue r JOIN channel_cost c ON r.channel = c.channel""",
         answer_query="""
 WITH channel_revenue AS (
     SELECT
