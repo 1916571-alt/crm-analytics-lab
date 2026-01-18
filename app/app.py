@@ -58,12 +58,47 @@ st.markdown("""
     [data-testid="stAppViewContainer"],
     [data-testid="stHeader"],
     .main,
-    .stApp {
+    .stApp,
+    [data-testid="stApp"] {
         background-color: #FFFFFF !important;
+        color-scheme: light !important;
     }
 
     [data-testid="stAppViewContainer"] > section > div {
         background-color: #FFFFFF !important;
+    }
+
+    /* 다크 모드 미디어 쿼리 무시 */
+    @media (prefers-color-scheme: dark) {
+        [data-testid="stAppViewContainer"],
+        [data-testid="stHeader"],
+        .main,
+        .stApp,
+        [data-testid="stApp"] {
+            background-color: #FFFFFF !important;
+            color-scheme: light !important;
+        }
+
+        [data-testid="stSelectbox"],
+        [data-testid="stSelectbox"] *,
+        .stSelectbox,
+        .stSelectbox * {
+            background-color: white !important;
+            color: #374151 !important;
+        }
+
+        [data-baseweb="select"],
+        [data-baseweb="select"] * {
+            background-color: white !important;
+        }
+
+        [role="listbox"],
+        [role="listbox"] *,
+        [role="option"],
+        [role="option"] * {
+            background-color: white !important;
+            color: #374151 !important;
+        }
     }
 
     /* ===== 전역 텍스트 색상 (검은색 강제) ===== */
@@ -79,10 +114,13 @@ st.markdown("""
         color: #111827 !important;
     }
 
-    /* 예외: 흰색 배경 요소 내 텍스트 */
+    /* ===== 다크 배경 요소 예외 (흰 텍스트) ===== */
+
+    /* 히어로 섹션 */
     .hero-section h1,
     .hero-section p,
-    .hero-section span {
+    .hero-section span,
+    .hero-section div {
         color: white !important;
     }
 
@@ -90,12 +128,39 @@ st.markdown("""
         color: #E0E7FF !important;
     }
 
-    /* 예외: 버튼 텍스트 */
+    /* SQL 에디터 (다크 배경) */
+    .stTextArea textarea,
+    textarea {
+        color: #F3F4F6 !important;
+    }
+
+    /* 코드 블록 (다크 배경) */
+    .stCodeBlock code,
+    .stCodeBlock pre,
+    .stCodeBlock span,
+    .stCodeBlock div,
+    [data-testid="stCodeBlock"] code,
+    [data-testid="stCodeBlock"] pre,
+    [data-testid="stCodeBlock"] span,
+    [data-testid="stCodeBlock"] div,
+    pre code,
+    pre code span {
+        color: #F3F4F6 !important;
+    }
+
+    /* 버튼 */
     button, .stButton > button {
         color: inherit !important;
     }
 
     .stButton > button[kind="primary"] {
+        color: white !important;
+    }
+
+    /* Primary 버튼 (다크 배경) */
+    .stButton > button[kind="primary"] span,
+    .stButton > button[kind="primary"] div,
+    .stButton > button[kind="primary"] p {
         color: white !important;
     }
 
@@ -275,16 +340,17 @@ st.markdown("""
         border: 1px solid var(--gray-300) !important;
     }
 
-    /* ===== SQL 에디터 ===== */
+    /* ===== SQL 에디터 (다크 배경) ===== */
     .stTextArea textarea {
         font-family: 'JetBrains Mono', 'Monaco', 'Menlo', monospace !important;
         font-size: 0.9rem !important;
         line-height: 1.6 !important;
         background-color: var(--gray-900) !important;
-        color: #E5E7EB !important;
+        color: #F3F4F6 !important;
         border: 2px solid var(--gray-700) !important;
         border-radius: 0.75rem !important;
         padding: 1rem !important;
+        caret-color: #F3F4F6 !important;
     }
 
     .stTextArea textarea:focus {
@@ -293,7 +359,13 @@ st.markdown("""
     }
 
     .stTextArea textarea::placeholder {
-        color: #6B7280 !important;
+        color: #9CA3AF !important;
+    }
+
+    /* SQL 에디터 레이블 (다크 배경 위) */
+    .stTextArea label,
+    .stTextArea [data-testid="stWidgetLabel"] {
+        color: #374151 !important;
     }
 
     /* ===== 데이터프레임 ===== */
@@ -400,43 +472,108 @@ st.markdown("""
         color: inherit !important;
     }
 
-    /* ===== 셀렉트박스 (메인 영역) ===== */
-    .main .stSelectbox [data-baseweb="select"] {
+    /* ===== 셀렉트박스 전체 (강제 라이트 모드) ===== */
+    [data-testid="stSelectbox"],
+    .stSelectbox {
+        background-color: transparent !important;
+    }
+
+    /* 셀렉트박스 컨테이너 */
+    [data-testid="stSelectbox"] > div,
+    .stSelectbox > div {
+        background-color: white !important;
+    }
+
+    /* 셀렉트박스 입력 영역 */
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    .stSelectbox [data-baseweb="select"] {
+        background-color: white !important;
         border-radius: 0.5rem !important;
     }
 
-    .main .stSelectbox [data-baseweb="select"] > div {
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stSelectbox [data-baseweb="select"] > div {
         background-color: white !important;
         border: 2px solid #E5E7EB !important;
         border-radius: 0.5rem !important;
         font-weight: 500 !important;
-        color: #374151 !important;
     }
 
-    .main .stSelectbox [data-baseweb="select"] > div:focus-within {
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within,
+    .stSelectbox [data-baseweb="select"] > div:focus-within {
         border-color: #4F46E5 !important;
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
     }
 
-    .main .stSelectbox [data-baseweb="select"] span {
+    /* 셀렉트박스 내부 모든 텍스트 - 검정색 (흰 배경) */
+    [data-testid="stSelectbox"] span,
+    [data-testid="stSelectbox"] div,
+    [data-testid="stSelectbox"] p,
+    [data-testid="stSelectbox"] input,
+    .stSelectbox span,
+    .stSelectbox div,
+    .stSelectbox p {
         color: #374151 !important;
     }
 
-    /* 셀렉트박스 드롭다운 */
-    [data-baseweb="popover"] [data-baseweb="menu"] {
+    /* 셀렉트박스 선택된 값 표시 영역 */
+    [data-testid="stSelectbox"] [data-baseweb="select"] [data-testid="stMarkdownContainer"],
+    [data-testid="stSelectbox"] [data-baseweb="select"] [data-testid="stMarkdownContainer"] p {
+        color: #374151 !important;
+    }
+
+    /* 셀렉트박스 아이콘 */
+    [data-testid="stSelectbox"] svg,
+    .stSelectbox svg {
+        fill: #6B7280 !important;
+    }
+
+    /* ===== 셀렉트박스 드롭다운 메뉴 (강제 라이트) ===== */
+    [data-baseweb="popover"],
+    [data-baseweb="popover"] > div,
+    [data-baseweb="menu"],
+    [role="listbox"],
+    ul[role="listbox"],
+    div[data-baseweb="popover"] {
+        background-color: white !important;
+        border: 1px solid #E5E7EB !important;
+    }
+
+    /* 드롭다운 옵션들 */
+    [data-baseweb="popover"] li,
+    [data-baseweb="menu"] li,
+    [role="option"],
+    li[role="option"] {
+        color: #374151 !important;
         background-color: white !important;
     }
 
-    [data-baseweb="popover"] li {
-        color: #374151 !important;
-    }
-
-    [data-baseweb="popover"] li:hover {
+    [data-baseweb="popover"] li:hover,
+    [data-baseweb="menu"] li:hover,
+    [role="option"]:hover,
+    li[role="option"]:hover {
         background-color: #F3F4F6 !important;
+        color: #111827 !important;
     }
 
-    /* ===== 코드 블록 (메인 영역) ===== */
-    .main code {
+    [role="option"][aria-selected="true"],
+    li[role="option"][aria-selected="true"] {
+        background-color: #EEF2FF !important;
+        color: #4F46E5 !important;
+    }
+
+    /* 드롭다운 내부 텍스트 */
+    [role="listbox"] span,
+    [role="listbox"] p,
+    [role="listbox"] div,
+    [role="option"] span,
+    [role="option"] p,
+    [role="option"] div {
+        color: inherit !important;
+    }
+
+    /* ===== 인라인 코드 (밝은 배경) ===== */
+    .main code:not(pre code) {
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.85rem !important;
         background-color: #F3F4F6 !important;
@@ -445,14 +582,40 @@ st.markdown("""
         border-radius: 0.25rem !important;
     }
 
-    .main .stCodeBlock {
+    /* ===== 코드 블록 (다크 배경 - 흰 텍스트) ===== */
+    .main .stCodeBlock,
+    [data-testid="stCodeBlock"] {
         border-radius: 0.75rem !important;
         overflow: hidden !important;
     }
 
-    .main .stCodeBlock code {
+    .main .stCodeBlock code,
+    .main .stCodeBlock pre,
+    .main .stCodeBlock pre code,
+    [data-testid="stCodeBlock"] code,
+    [data-testid="stCodeBlock"] pre,
+    [data-testid="stCodeBlock"] pre code,
+    pre code {
+        font-family: 'JetBrains Mono', monospace !important;
         background-color: #1F2937 !important;
-        color: #E5E7EB !important;
+        color: #F3F4F6 !important;
+    }
+
+    /* 코드 블록 내부 모든 텍스트 - 밝은 색 */
+    .main .stCodeBlock *,
+    [data-testid="stCodeBlock"] * {
+        color: #F3F4F6 !important;
+    }
+
+    /* 코드 블록 복사 버튼 */
+    .main .stCodeBlock button,
+    [data-testid="stCodeBlock"] button {
+        color: #9CA3AF !important;
+    }
+
+    .main .stCodeBlock button:hover,
+    [data-testid="stCodeBlock"] button:hover {
+        color: #F3F4F6 !important;
     }
 
     /* ===== Divider ===== */
