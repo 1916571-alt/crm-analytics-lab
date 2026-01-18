@@ -457,60 +457,98 @@ ORDER BY roi_percent DESC
 def show_ltv_cac_module():
     """LTV & CAC 모듈 메인"""
 
-    st.title("💰 LTV & CAC 분석")
-
+    # 모듈 헤더
     st.markdown("""
-    > **LTV**(Customer Lifetime Value)와 **CAC**(Customer Acquisition Cost)는
-    > 비즈니스 건전성을 판단하는 가장 중요한 지표입니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">💰 LTV & CAC 분석</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            고객 생애 가치와 획득 비용 분석 · 비즈니스 건전성 판단의 핵심 지표
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 개념 카드
-    with st.expander("📚 핵심 개념 보기", expanded=False):
+    with st.expander("핵심 개념 보기", expanded=False):
         col1, col2 = st.columns(2)
 
         with col1:
             st.markdown("""
-            ### LTV (Customer Lifetime Value)
-
-            고객 한 명이 전체 기간 동안 창출하는 총 가치
-
-            **계산 방법:**
-            - Historical LTV = 고객별 총 매출의 평균
-            - Predictive LTV = ARPU × 활동 기간 × 마진율
-
-            **활용:**
-            - 고객 가치 세그먼트 정의
-            - 마케팅 예산 상한선 설정
-            - VIP 프로그램 기준
-            """)
+            <div class="custom-card">
+                <h3 style="color: #4F46E5 !important; margin-bottom: 1rem !important;">LTV (Customer Lifetime Value)</h3>
+                <p style="font-weight: 600; margin-bottom: 0.75rem;">고객 한 명이 전체 기간 동안 창출하는 총 가치</p>
+                <p style="font-size: 0.9rem !important; font-weight: 600; color: #374151; margin-top: 1rem;">계산 방법</p>
+                <ul>
+                    <li>Historical LTV = 고객별 총 매출의 평균</li>
+                    <li>Predictive LTV = ARPU × 활동 기간 × 마진율</li>
+                </ul>
+                <p style="font-size: 0.9rem !important; font-weight: 600; color: #374151; margin-top: 1rem;">활용</p>
+                <ul>
+                    <li>고객 가치 세그먼트 정의</li>
+                    <li>마케팅 예산 상한선 설정</li>
+                    <li>VIP 프로그램 기준</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
         with col2:
             st.markdown("""
-            ### CAC (Customer Acquisition Cost)
+            <div class="custom-card">
+                <h3 style="color: #4F46E5 !important; margin-bottom: 1rem !important;">CAC (Customer Acquisition Cost)</h3>
+                <p style="font-weight: 600; margin-bottom: 0.75rem;">신규 고객 한 명을 획득하는 데 드는 비용</p>
+                <p style="font-size: 0.9rem !important; font-weight: 600; color: #374151; margin-top: 1rem;">계산 방법</p>
+                <ul>
+                    <li>CAC = 마케팅 비용 / 신규 고객 수</li>
+                </ul>
+                <p style="font-size: 0.9rem !important; font-weight: 600; color: #374151; margin-top: 1rem;">활용</p>
+                <ul>
+                    <li>채널별 효율성 비교</li>
+                    <li>마케팅 예산 배분</li>
+                    <li>Unit Economics 분석</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
-            신규 고객 한 명을 획득하는 데 드는 비용
-
-            **계산 방법:**
-            - CAC = 마케팅 비용 / 신규 고객 수
-
-            **활용:**
-            - 채널별 효율성 비교
-            - 마케팅 예산 배분
-            - Unit Economics 분석
-            """)
-
-        st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("""
-        ### LTV:CAC 비율
+        <div class="custom-card">
+            <h3 style="color: #4F46E5 !important; margin-bottom: 1rem !important;">LTV:CAC 비율 해석</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
-        | 비율 | 해석 | 액션 |
-        |------|------|------|
-        | **3:1 이상** | 건전함 | 성장 투자 확대 |
-        | **1:1 ~ 3:1** | 주의 필요 | 효율화 필요 |
-        | **1:1 미만** | 적자 | 즉시 개선 필요 |
-        | **10:1 이상** | 과소 투자 | 마케팅 확대 검토 |
-        """)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown("""
+            <div style="text-align: center; padding: 1rem; background: #D1FAE5; border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #047857;">3:1+</div>
+                <div style="font-size: 0.85rem; color: #047857; font-weight: 600;">건전함</div>
+                <div style="font-size: 0.8rem; color: #6B7280; margin-top: 0.5rem;">성장 투자 확대</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown("""
+            <div style="text-align: center; padding: 1rem; background: #FEF3C7; border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #D97706;">1:1~3:1</div>
+                <div style="font-size: 0.85rem; color: #D97706; font-weight: 600;">주의 필요</div>
+                <div style="font-size: 0.8rem; color: #6B7280; margin-top: 0.5rem;">효율화 필요</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown("""
+            <div style="text-align: center; padding: 1rem; background: #FEE2E2; border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #DC2626;">&lt;1:1</div>
+                <div style="font-size: 0.85rem; color: #DC2626; font-weight: 600;">적자</div>
+                <div style="font-size: 0.8rem; color: #6B7280; margin-top: 0.5rem;">즉시 개선 필요</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            st.markdown("""
+            <div style="text-align: center; padding: 1rem; background: #DBEAFE; border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; color: #2563EB;">10:1+</div>
+                <div style="font-size: 0.85rem; color: #2563EB; font-weight: 600;">과소 투자</div>
+                <div style="font-size: 0.8rem; color: #6B7280; margin-top: 0.5rem;">마케팅 확대 검토</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.divider()
 

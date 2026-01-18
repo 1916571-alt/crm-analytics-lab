@@ -981,12 +981,15 @@ FROM z_test z
 def show_ab_test_module():
     """A/B 테스트 분석 모듈"""
 
-    st.title("🧪 A/B 테스트 분석")
-
+    # 모듈 헤더
     st.markdown("""
-    > **A/B 테스트**는 데이터 기반 의사결정의 핵심 도구입니다.
-    > 통계적 유의성을 이해하고 올바르게 해석하는 것이 중요합니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">🧪 A/B 테스트 분석</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            통계적 유의성 기반 실험 분석 · 데이터 기반 의사결정의 핵심
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     with st.expander("📚 핵심 개념 보기", expanded=False):
         st.markdown("""

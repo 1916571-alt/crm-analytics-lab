@@ -420,12 +420,15 @@ ORDER BY cohort_month
 def show_cohort_module():
     """Cohort 분석 모듈"""
 
-    st.title("📅 Cohort 리텐션 분석")
-
+    # 모듈 헤더
     st.markdown("""
-    > **코호트 분석**은 동일한 특성을 가진 그룹의 시간에 따른 행동을 추적합니다.
-    > 리텐션 개선의 핵심 도구입니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">📅 Cohort 리텐션 분석</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            코호트 기반 리텐션 분석 · 시간에 따른 고객 유지율 추적
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     with st.expander("📚 핵심 개념 보기", expanded=False):
         st.markdown("""

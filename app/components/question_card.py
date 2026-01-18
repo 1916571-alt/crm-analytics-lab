@@ -45,21 +45,30 @@ class QuestionCard:
         """
         q = self.question
 
-        # 난이도 표시
-        difficulty_stars = "⭐" * q.difficulty
+        # 난이도 표시 (별 대신 레벨 뱃지)
+        difficulty_labels = {1: "기초", 2: "기초+", 3: "중급", 4: "중급+", 5: "고급"}
+        difficulty_colors = {1: "badge-green", 2: "badge-green", 3: "badge-purple", 4: "badge-purple", 5: "badge-orange"}
+        difficulty_label = difficulty_labels.get(q.difficulty, "기초")
+        difficulty_color = difficulty_colors.get(q.difficulty, "badge-green")
 
         # 완료 상태 확인
         is_already_completed = self.key in st.session_state.get('completed_questions', {})
-        completed_badge = " ✅" if is_already_completed else ""
+        completed_badge = '<span class="badge badge-green" style="margin-left: 0.5rem;">완료</span>' if is_already_completed else ""
 
-        # 제목
-        st.markdown(f"### {q.title} {difficulty_stars}{completed_badge}")
+        # 제목 + 난이도 뱃지
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0 !important; font-size: 1.5rem !important;">{q.title}</h3>
+            <span class="badge {difficulty_color}" style="margin-left: 0.75rem;">{difficulty_label}</span>
+            {completed_badge}
+        </div>
+        """, unsafe_allow_html=True)
 
         # 문제 설명
         st.markdown(f"""
-        <div style="background-color: #F3F4F6; color: #1F2937; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-            <strong>📋 문제</strong><br>
-            {q.description}
+        <div class="question-box">
+            <span class="label">PROBLEM</span>
+            <div class="content">{q.description}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -67,7 +76,11 @@ class QuestionCard:
         self._render_step_hints(q.hint)
 
         # SQL 에디터
-        st.markdown("**✏️ SQL 작성**")
+        st.markdown("""
+        <div style="margin-top: 1.5rem; margin-bottom: 0.75rem;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em;">SQL EDITOR</span>
+        </div>
+        """, unsafe_allow_html=True)
 
         # 저장된 쿼리 불러오기 (세션 또는 DB에서)
         saved_query = ""
@@ -121,10 +134,14 @@ class QuestionCard:
             error = st.session_state.get(f"error_{self.key}")
 
             if error:
-                st.error(f"❌ 오류: {error}")
+                st.error(f"오류: {error}")
             elif result_df is not None:
-                st.markdown("**📊 실행 결과**")
-                st.dataframe(result_df, width="stretch")
+                st.markdown("""
+                <div style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.05em;">RESULT</span>
+                </div>
+                """, unsafe_allow_html=True)
+                st.dataframe(result_df, use_container_width=True)
                 st.caption(f"{len(result_df)}개 행 반환")
 
         # 정답 확인
@@ -183,17 +200,17 @@ class QuestionCard:
 
             # 해설
             st.markdown(f"""
-            <div style="background-color: #D1FAE5; color: #1F2937; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #10B981;">
-                <strong>📖 해설</strong><br>
-                {q.explanation}
+            <div class="explanation-box">
+                <div class="label">EXPLANATION</div>
+                <div class="content">{q.explanation}</div>
             </div>
             """, unsafe_allow_html=True)
 
             # 면접 TIP
             st.markdown(f"""
-            <div style="background-color: #EDE9FE; color: #1F2937; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #8B5CF6;">
-                <strong>💼 면접 TIP</strong><br>
-                {q.interview_tip}
+            <div class="tip-box">
+                <div class="label">INTERVIEW TIP</div>
+                <div class="content">{q.interview_tip}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -218,9 +235,9 @@ class QuestionCard:
 
         # 단계별 제목
         step_titles = [
-            "🎯 1단계: 접근 방향",
-            "🔧 2단계: 필요한 함수/문법",
-            "📝 3단계: 쿼리 뼈대"
+            "STEP 1 · 접근 방향",
+            "STEP 2 · 필요한 함수/문법",
+            "STEP 3 · 쿼리 뼈대"
         ]
 
         # 현재 공개된 힌트 단계 (세션 상태)
@@ -230,46 +247,51 @@ class QuestionCard:
 
         current_step = st.session_state[hint_key]
 
-        # 힌트 컨테이너
-        with st.container():
-            # 힌트 버튼
-            col1, col2, col3 = st.columns([1, 1, 3])
+        # 힌트 섹션 제목
+        st.markdown("""
+        <div style="margin-top: 1.5rem; margin-bottom: 0.75rem;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em;">HINTS</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-            with col1:
-                if current_step < total_steps:
-                    next_step_label = f"💡 힌트 {current_step + 1}/{total_steps}"
-                    if st.button(next_step_label, key=f"hint_btn_{self.key}"):
-                        st.session_state[hint_key] = current_step + 1
-                        st.rerun()
-                else:
-                    st.caption(f"💡 힌트 {total_steps}/{total_steps} (모두 공개)")
+        # 힌트 버튼
+        col1, col2, col3 = st.columns([1, 1, 3])
 
-            with col2:
-                if current_step > 0:
-                    if st.button("🔒 힌트 숨기기", key=f"hint_hide_{self.key}"):
-                        st.session_state[hint_key] = 0
-                        st.rerun()
+        with col1:
+            if current_step < total_steps:
+                next_step_label = f"힌트 보기 ({current_step + 1}/{total_steps})"
+                if st.button(next_step_label, key=f"hint_btn_{self.key}"):
+                    st.session_state[hint_key] = current_step + 1
+                    st.rerun()
+            else:
+                st.markdown(f"""
+                <span style="font-size: 0.85rem; color: #059669; font-weight: 500;">
+                    모든 힌트 공개됨 ({total_steps}/{total_steps})
+                </span>
+                """, unsafe_allow_html=True)
 
-            # 공개된 힌트 표시
+        with col2:
             if current_step > 0:
-                for i in range(current_step):
-                    step_title = step_titles[i] if i < len(step_titles) else f"💡 힌트 {i + 1}"
-                    step_content = steps[i] if i < len(steps) else ""
+                if st.button("힌트 숨기기", key=f"hint_hide_{self.key}"):
+                    st.session_state[hint_key] = 0
+                    st.rerun()
 
-                    # 단계별 색상
-                    colors = ["#FEF3C7", "#DBEAFE", "#E0E7FF"]  # 노랑, 파랑, 보라
-                    border_colors = ["#F59E0B", "#3B82F6", "#6366F1"]
+        # 공개된 힌트 표시
+        if current_step > 0:
+            # 힌트 박스 클래스 (단계별)
+            hint_classes = ["hint-box", "hint-box hint-box-blue", "hint-box hint-box-purple"]
 
-                    bg_color = colors[i % len(colors)]
-                    border_color = border_colors[i % len(border_colors)]
+            for i in range(current_step):
+                step_title = step_titles[i] if i < len(step_titles) else f"STEP {i + 1}"
+                step_content = steps[i] if i < len(steps) else ""
+                hint_class = hint_classes[i % len(hint_classes)]
 
-                    st.markdown(f"""
-                    <div style="background-color: {bg_color}; color: #1F2937; padding: 0.75rem 1rem;
-                                border-radius: 0.5rem; margin: 0.5rem 0; border-left: 4px solid {border_color};">
-                        <strong>{step_title}</strong><br>
-                        <span style="white-space: pre-wrap;">{step_content}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="{hint_class}">
+                    <div class="label">{step_title}</div>
+                    <div class="content">{step_content}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
     def _parse_hint_steps(self, hint: str) -> list[str]:
         """

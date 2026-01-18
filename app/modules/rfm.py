@@ -469,12 +469,15 @@ LIMIT 10
 def show_rfm_module():
     """RFM 세그먼테이션 모듈"""
 
-    st.title("🎯 RFM 세그먼테이션")
-
+    # 모듈 헤더
     st.markdown("""
-    > **RFM 분석**은 Recency, Frequency, Monetary 세 지표로
-    > 고객을 세그먼트로 분류하여 맞춤 마케팅을 실행합니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">🎯 RFM 세그먼테이션</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            Recency · Frequency · Monetary 기반 고객 세분화 분석
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     with st.expander("📚 핵심 개념 보기", expanded=False):
         st.markdown("""

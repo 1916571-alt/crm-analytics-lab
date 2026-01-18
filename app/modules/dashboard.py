@@ -19,11 +19,15 @@ def get_db_connection():
 def show_dashboard():
     """학습 결과 대시보드"""
 
-    st.title("📊 My Analytics Dashboard")
-
+    # 모듈 헤더
     st.markdown("""
-    > 학습을 통해 산출한 CRM 핵심 지표를 한눈에 확인하세요.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">📊 My Analytics Dashboard</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            학습 진행 현황과 핵심 CRM 지표를 한눈에 확인
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 진행률
     col1, col2, col3, col4 = st.columns(4)

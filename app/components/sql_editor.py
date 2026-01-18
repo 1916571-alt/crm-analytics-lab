@@ -24,23 +24,31 @@ class SQLEditor:
         Returns:
             tuple: (입력된 쿼리, 결과 DataFrame, 에러 메시지)
         """
+        # 섹션 제목
+        st.markdown("""
+        <div style="margin-bottom: 0.75rem;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em;">SQL EDITOR</span>
+        </div>
+        """, unsafe_allow_html=True)
+
         # SQL 입력
         query = st.text_area(
             "SQL 쿼리 입력",
             value=self.default_query,
             height=self.height,
             key=f"sql_editor_{self.key}",
-            placeholder="SELECT * FROM customers LIMIT 10"
+            placeholder="SELECT * FROM customers LIMIT 10",
+            label_visibility="collapsed"
         )
 
         # 버튼 행
         col1, col2, col3 = st.columns([1, 1, 3])
 
         with col1:
-            run_clicked = st.button("▶️ 실행", key=f"run_{self.key}", type="primary")
+            run_clicked = st.button("실행", key=f"run_{self.key}", type="primary")
 
         with col2:
-            clear_clicked = st.button("🔄 초기화", key=f"clear_{self.key}")
+            clear_clicked = st.button("초기화", key=f"clear_{self.key}")
 
         # 초기화 버튼 클릭 시
         if clear_clicked:
@@ -100,9 +108,14 @@ def render_sql_editor(
 
     if show_result:
         if error:
-            st.error(f"❌ 오류: {error}")
+            st.error(f"오류: {error}")
         elif result_df is not None:
-            st.success(f"✅ {len(result_df)}개 행 반환")
-            st.dataframe(result_df, width="stretch")
+            st.markdown("""
+            <div style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.05em;">RESULT</span>
+            </div>
+            """, unsafe_allow_html=True)
+            st.dataframe(result_df, use_container_width=True)
+            st.caption(f"{len(result_df)}개 행 반환")
 
     return query, result_df

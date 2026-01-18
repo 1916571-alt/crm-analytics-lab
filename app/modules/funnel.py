@@ -450,12 +450,15 @@ ORDER BY hour
 def show_funnel_module():
     """Funnel 분석 모듈"""
 
-    st.title("🔄 Funnel 분석")
-
+    # 모듈 헤더
     st.markdown("""
-    > **퍼널 분석**은 사용자가 목표(구매)까지 거치는 여정을 분석하여
-    > 병목 지점을 찾고 전환율을 개선합니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">🔄 Funnel 분석</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            전환 퍼널 분석 · 사용자 여정의 병목 지점을 찾고 전환율 개선
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     with st.expander("📚 핵심 개념 보기", expanded=False):
         st.markdown("""

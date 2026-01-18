@@ -14,13 +14,15 @@ import plotly.express as px
 def show_concepts_module():
     """개념 학습 메인 페이지"""
 
-    st.title("CRM 분석 개념 학습")
-    st.markdown("### 실습 전에 알아야 할 핵심 프레임워크")
-
+    # 모듈 헤더
     st.markdown("""
-    > CRM 분석은 단순히 SQL을 잘 쓰는 것이 아닙니다.
-    > **비즈니스 맥락을 이해하고, 올바른 질문을 던지는 것**이 핵심입니다.
-    """)
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem !important;">📖 CRM 분석 개념 학습</h1>
+        <p style="font-size: 1.1rem !important; color: #6B7280 !important;">
+            실습 전 필수 개념 · 비즈니스 맥락을 이해하고 올바른 질문 던지기
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
 
