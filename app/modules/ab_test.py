@@ -32,19 +32,18 @@ QUESTIONS = [
         - 전환율 (%)
         - 결과 컬럼: variant, users, conversions, conversion_rate
         """,
-        hint="""
-        **힌트:**
-        1. device를 variant로 변환 (desktop=control, mobile=treatment)
-        2. page_view 이벤트로 전체 사용자 수 계산
-        3. purchase 이벤트로 전환 사용자 수 계산
-
-        ```sql
-        SELECT
-            CASE device WHEN 'desktop' THEN 'control' ELSE 'treatment' END as variant,
-            COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN user_id END) as users,
-            ...
-        ```
-        """,
+        hint="""device 컬럼을 실험 그룹으로 변환하고, 그룹별 전체 사용자 수와 전환 사용자 수를 집계합니다.
+---
+필요한 함수: CASE WHEN, COUNT(DISTINCT CASE WHEN ... THEN ... END), ROUND(), GROUP BY
+---
+SELECT
+    CASE device WHEN 'desktop' THEN 'control' ELSE 'treatment' END as variant,
+    COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN user_id END) as users,
+    COUNT(DISTINCT CASE WHEN event_type = 'purchase' THEN user_id END) as conversions,
+    -- 전환율 = conversions / users * 100
+FROM events
+WHERE event_type IN ('page_view', 'purchase')
+GROUP BY ...""",
         answer_query="""
 SELECT
     CASE device
@@ -107,20 +106,18 @@ GROUP BY
         - 절대적 차이 (difference_pp: percentage point)
         - 상대적 개선 (uplift_percent)
         """,
-        hint="""
-        **힌트:**
-        1. 먼저 그룹별 전환율을 계산하는 CTE
-        2. 두 그룹의 값을 한 행에서 비교
-
-        ```sql
-        WITH group_rates AS (
-            SELECT variant, conversion_rate FROM ...
-        )
-        SELECT
-            (SELECT conversion_rate FROM group_rates WHERE variant = 'treatment') -
-            (SELECT conversion_rate FROM group_rates WHERE variant = 'control') as difference
-        ```
-        """,
+        hint="""그룹별 전환율을 계산한 후, 서브쿼리로 Control과 Treatment 값을 한 행에서 비교합니다.
+---
+필요한 함수: CTE(WITH절), 서브쿼리, ROUND(), 산술 연산
+---
+WITH group_stats AS (
+    SELECT variant, conversion_rate FROM ...
+)
+SELECT
+    (SELECT conversion_rate FROM group_stats WHERE variant = 'control') as control_rate,
+    (SELECT conversion_rate FROM group_stats WHERE variant = 'treatment') as treatment_rate,
+    -- difference_pp = treatment - control
+    -- uplift_percent = (treatment - control) / control * 100""",
         answer_query="""
 WITH group_stats AS (
     SELECT
@@ -193,16 +190,17 @@ SELECT
         - p_pool: 통합 전환율
         - standard_error: 표준 오차
         """,
-        hint="""
-        **힌트:**
-        1. 그룹별 n, x 계산
-        2. p_pool = (x1 + x2) / (n1 + n2)
-        3. SE 계산 (SQRT 함수 사용)
+        hint="""각 그룹의 샘플 수(n)와 전환 수(x)를 구한 후, Pooled 전환율과 Standard Error를 계산합니다.
+---
+필요한 함수: COUNT(DISTINCT), MAX(CASE WHEN), SQRT(), ROUND(), 산술 연산
+---
+-- p_pool = (x1 + x2) / (n1 + n2)
+-- SE = SQRT(p_pool * (1 - p_pool) * (1.0/n1 + 1.0/n2))
 
-        ```sql
-        SQRT(p_pool * (1 - p_pool) * (1.0/n1 + 1.0/n2))
-        ```
-        """,
+SELECT
+    n1, x1, n2, x2,
+    ROUND((x1 + x2) * 1.0 / (n1 + n2), 6) as p_pool,
+    ROUND(SQRT(...), 6) as standard_error""",
         answer_query="""
 WITH group_stats AS (
     SELECT
@@ -286,15 +284,18 @@ FROM stats
         - Z-score 계산
         - Z > 1.96이면 유의 (95% 신뢰수준)
         """,
-        hint="""
-        **힌트:**
-        이전 문제의 결과를 확장하여
-        Z = (p2 - p1) / SE 계산
+        hint="""Pooled 전환율과 SE를 계산한 후, Z-score = (p2 - p1) / SE 공식을 적용합니다.
+---
+필요한 함수: SQRT(), ABS(), CASE WHEN (유의성 판정), 이전 문제의 CTE 구조 확장
+---
+-- Z = (p2 - p1) / SE
+-- |Z| > 1.96이면 95% 신뢰수준에서 유의
 
-        ```sql
-        (p2 - p1) / standard_error as z_score
-        ```
-        """,
+SELECT
+    ROUND(p1 * 100, 2) as control_rate_pct,
+    ROUND(p2 * 100, 2) as treatment_rate_pct,
+    ROUND((p2 - p1) / se, 4) as z_score,
+    CASE WHEN ABS((p2 - p1) / se) > 1.96 THEN 'Significant' ELSE 'Not Significant' END""",
         answer_query="""
 WITH group_stats AS (
     SELECT
@@ -388,17 +389,18 @@ FROM with_se
         - MDE (절대값)
         - 필요 샘플 사이즈 (그룹당)
         """,
-        hint="""
-        **힌트:**
-        1. Control 전환율 계산
-        2. MDE = 전환율 × 0.2
-        3. 공식 대입
+        hint="""Control 전환율을 구하고, 샘플 사이즈 공식에 대입합니다. SQLite에는 POWER 함수가 없어 곱셈을 사용합니다.
+---
+필요한 함수: COUNT(DISTINCT), ROUND(), 산술 연산 (곱셈으로 제곱 표현)
+---
+-- n = 2 * ((Z_a + Z_b)^2 * p * (1-p)) / MDE^2
+-- Z_a = 1.96 (95% 신뢰수준), Z_b = 0.84 (80% 검정력)
+-- MDE = p * 0.2 (20% 상대적 개선)
 
-        SQLite에서는 POWER 함수 대신 곱셈 사용
-        ```sql
-        2 * ((1.96 + 0.84) * (1.96 + 0.84) * p * (1-p)) / (mde * mde)
-        ```
-        """,
+SELECT
+    ROUND(p * 100, 2) as control_rate_pct,
+    ROUND(p * 0.2 * 100, 3) as mde_pct,
+    ROUND(2 * ((1.96 + 0.84) * (1.96 + 0.84) * p * (1-p)) / ((p*0.2) * (p*0.2)), 0) as required_sample""",
         answer_query="""
 WITH control_rate AS (
     SELECT
@@ -472,16 +474,21 @@ FROM control_rate
         - 채널별 Uplift
         - 결과 컬럼: channel, control_rate, treatment_rate, uplift_pct
         """,
-        hint="""
-        **힌트:**
-        채널과 디바이스(실험그룹)로 그룹화한 후
-        PIVOT 형태로 변환
-
-        ```sql
-        MAX(CASE WHEN variant = 'control' THEN rate END) as control_rate,
-        MAX(CASE WHEN variant = 'treatment' THEN rate END) as treatment_rate
-        ```
-        """,
+        hint="""채널과 실험그룹으로 그룹화하여 전환율을 계산한 후, PIVOT 형태로 변환하여 채널별 비교를 합니다.
+---
+필요한 함수: COUNT(DISTINCT CASE WHEN), NULLIF(), MAX(CASE WHEN), ROUND(), GROUP BY
+---
+WITH segment_stats AS (
+    SELECT channel, variant, rate
+    FROM ... GROUP BY channel, variant
+)
+SELECT
+    channel,
+    MAX(CASE WHEN variant = 'control' THEN rate END) as control_rate,
+    MAX(CASE WHEN variant = 'treatment' THEN rate END) as treatment_rate,
+    -- uplift_pct = (treatment - control) / control * 100
+FROM segment_stats
+GROUP BY channel""",
         answer_query="""
 WITH segment_stats AS (
     SELECT
@@ -557,14 +564,22 @@ ORDER BY uplift_pct DESC
         - 일별, 그룹별 전환율
         - 결과 컬럼: date, control_rate, treatment_rate, difference
         """,
-        hint="""
-        **힌트:**
-        날짜와 실험그룹으로 그룹화한 후 PIVOT
-
-        ```sql
-        GROUP BY date(event_date), variant
-        ```
-        """,
+        hint="""날짜와 실험그룹으로 그룹화하여 일별 전환율을 계산하고 PIVOT 형태로 변환합니다.
+---
+필요한 함수: date(), COUNT(DISTINCT CASE WHEN), NULLIF(), MAX(CASE WHEN), GROUP BY, ORDER BY
+---
+WITH daily_stats AS (
+    SELECT date(event_date) as date, variant, rate
+    FROM ... GROUP BY date(event_date), variant
+)
+SELECT
+    date,
+    MAX(CASE WHEN variant = 'control' THEN rate END) as control_rate,
+    MAX(CASE WHEN variant = 'treatment' THEN rate END) as treatment_rate,
+    -- difference = treatment - control
+FROM daily_stats
+GROUP BY date
+ORDER BY date""",
         answer_query="""
 WITH daily_stats AS (
     SELECT
@@ -644,19 +659,19 @@ LIMIT 14
         - customers와 transactions를 JOIN하여 고객 유형 판별
         - 고객 유형별 실험 효과
         """,
-        hint="""
-        **힌트:**
-        1. 고객별 첫 구매일 확인
-        2. 실험 기간(2024-06) 내 첫 구매면 신규
-        3. 그 전에 구매 이력이 있으면 기존
-
-        ```sql
-        CASE
-            WHEN MIN(transaction_date) >= '2024-06-01' THEN 'new'
-            ELSE 'returning'
-        END as customer_type
-        ```
-        """,
+        hint="""transactions에서 고객별 첫 구매일을 확인하여 신규/기존을 판별하고, 고객 유형별 실험 효과를 분석합니다.
+---
+필요한 함수: MIN(), CASE WHEN, COALESCE(), LEFT JOIN, COUNT(DISTINCT CASE WHEN), GROUP BY
+---
+WITH customer_type AS (
+    SELECT customer_id,
+        CASE WHEN MIN(transaction_date) >= '2024-06-01' THEN 'new'
+             ELSE 'returning'
+        END as cust_type
+    FROM transactions
+    GROUP BY customer_id
+)
+-- events와 JOIN하여 고객 유형별 전환율 계산""",
         answer_query="""
 WITH customer_type AS (
     SELECT
@@ -753,13 +768,20 @@ GROUP BY customer_type
         - 그룹별 평균 객단가 (구매자 기준)
         - 그룹별 RPU (전체 사용자 기준)
         """,
-        hint="""
-        **힌트:**
-        1. events와 transactions를 JOIN
-        2. 전환율, 객단가, RPU 각각 계산
+        hint="""events와 transactions를 JOIN하여 사용자별 매출을 집계하고, 전환율/객단가/RPU를 계산합니다.
+---
+필요한 함수: LEFT JOIN, COALESCE(), SUM(), COUNT(DISTINCT CASE WHEN), NULLIF(), ROUND()
+---
+-- RPU = 총 매출 / 전체 사용자 수
+-- AOV = 총 매출 / 전환 사용자 수 (구매자 기준 객단가)
 
-        RPU = 총 매출 / 전체 사용자 수
-        """,
+WITH user_revenue AS (
+    SELECT e.user_id, e.device, visited, converted, revenue
+    FROM events e
+    LEFT JOIN transactions t ON e.user_id = t.customer_id
+    ...
+)
+SELECT variant, total_users, converters, conversion_rate, avg_order_value, revenue_per_user""",
         answer_query="""
 WITH user_revenue AS (
     SELECT
@@ -833,19 +855,20 @@ GROUP BY CASE device WHEN 'desktop' THEN 'control' ELSE 'treatment' END
         - 세그먼트별 요약
         - 권고 사항
         """,
-        hint="""
-        **힌트:**
-        여러 CTE를 조합하여 종합 리포트 생성
-
-        ```sql
-        WITH
-            experiment_overview AS (...),
-            conversion_stats AS (...),
-            statistical_test AS (...),
-            segment_summary AS (...)
-        SELECT * FROM ...
-        ```
-        """,
+        hint="""여러 CTE를 조합하여 실험 개요, 전환율, Z-test 결과, 권고사항을 하나의 리포트로 통합합니다.
+---
+필요한 함수: MIN(), MAX(), COUNT(DISTINCT), SQRT(), ABS(), CASE WHEN, UNION ALL, CAST
+---
+WITH
+    experiment_overview AS (...기간, 샘플 수...),
+    group_stats AS (...그룹별 n, x, p...),
+    z_test AS (...p_pool, se, z_score 계산...)
+SELECT section, metric, value
+FROM ...
+UNION ALL
+SELECT 'Results', 'Control Rate', ROUND(p1*100,2)||'%' FROM z_test
+UNION ALL
+...권고사항: Z-score 기반 APPLY/KEEP/EXTEND 판단...""",
         answer_query="""
 WITH experiment_overview AS (
     SELECT

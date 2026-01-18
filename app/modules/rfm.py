@@ -30,22 +30,19 @@ QUESTIONS = [
         - 결과 컬럼: customer_id, recency, frequency, monetary
         - recency가 낮은 순으로 상위 10명
         """,
-        hint="""
-        **힌트:**
-        - Recency: julianday('2024-06-30') - julianday(MAX(transaction_date))
-        - Frequency: COUNT(*)
-        - Monetary: SUM(amount)
-
-        ```sql
-        SELECT
-            customer_id,
-            julianday('2024-06-30') - julianday(MAX(transaction_date)) as recency,
-            COUNT(*) as frequency,
-            SUM(amount) as monetary
-        FROM transactions
-        GROUP BY customer_id
-        ```
-        """,
+        hint="""각 고객의 마지막 구매일로부터의 경과일(R), 구매 횟수(F), 총 구매금액(M)을 계산합니다.
+---
+필요한 함수: julianday(), MAX(), COUNT(*), SUM(), ROUND(), GROUP BY, ORDER BY, LIMIT
+---
+SELECT
+    customer_id,
+    ROUND(julianday('2024-06-30') - julianday(MAX(transaction_date)), 0) as recency,
+    COUNT(*) as frequency,
+    SUM(amount) as monetary
+FROM transactions
+GROUP BY customer_id
+ORDER BY recency ASC
+LIMIT 10""",
         answer_query="""
 SELECT
     customer_id,
@@ -98,18 +95,20 @@ LIMIT 10
         - F, M: 높을수록 높은 점수
         - 결과 컬럼: customer_id, recency, frequency, monetary, r_score, f_score, m_score
         """,
-        hint="""
-        **힌트:**
-        1. 먼저 RFM 값을 계산하는 CTE
-        2. NTILE(5)로 분위수 계산
-        3. R은 역순 (낮을수록 높은 점수)
-
-        ```sql
-        NTILE(5) OVER (ORDER BY recency DESC) as r_score,  -- 역순
-        NTILE(5) OVER (ORDER BY frequency ASC) as f_score,
-        NTILE(5) OVER (ORDER BY monetary ASC) as m_score
-        ```
-        """,
+        hint="""RFM 값을 먼저 계산하고, NTILE(5) 윈도우 함수로 5분위 점수를 부여합니다. R은 낮을수록 좋으므로 역순 정렬!
+---
+필요한 함수: NTILE(5) OVER(ORDER BY ...), CTE(WITH절), 윈도우 함수
+---
+WITH rfm AS (
+    SELECT customer_id, recency, frequency, monetary
+    FROM ...
+)
+SELECT
+    customer_id, recency, frequency, monetary,
+    NTILE(5) OVER (ORDER BY recency DESC) as r_score,  -- 역순! 낮은 recency = 높은 점수
+    NTILE(5) OVER (ORDER BY frequency ASC) as f_score,
+    NTILE(5) OVER (ORDER BY monetary ASC) as m_score
+FROM rfm""",
         answer_query="""
 WITH rfm AS (
     SELECT
@@ -181,20 +180,19 @@ LIMIT 20
         - 세그먼트별 고객 수와 평균 monetary
         - 결과 컬럼: segment, customer_count, avg_monetary
         """,
-        hint="""
-        **힌트:**
-        1. RFM 점수 계산 CTE
-        2. CASE WHEN으로 세그먼트 분류
-        3. 세그먼트별 집계
+        hint="""RFM 점수를 계산한 후 CASE WHEN으로 세그먼트를 분류하고, 세그먼트별 통계를 집계합니다.
+---
+필요한 함수: NTILE(5), CASE WHEN THEN ELSE END, COUNT(*), AVG(), ROUND(), GROUP BY
+---
+CASE
+    WHEN r_score >= 4 AND f_score >= 4 AND m_score >= 4 THEN 'Champions'
+    WHEN f_score >= 4 THEN 'Loyal'
+    WHEN r_score <= 2 AND f_score >= 3 THEN 'At Risk'
+    WHEN r_score <= 2 AND f_score <= 2 THEN 'Lost'
+    ELSE 'Others'
+END as segment
 
-        ```sql
-        CASE
-            WHEN r_score >= 4 AND f_score >= 4 AND m_score >= 4 THEN 'Champions'
-            WHEN f_score >= 4 THEN 'Loyal'
-            ...
-        END as segment
-        ```
-        """,
+-- 세그먼트별 COUNT, AVG(monetary) 집계""",
         answer_query="""
 WITH rfm AS (
     SELECT
@@ -279,17 +277,21 @@ ORDER BY avg_monetary DESC
         - 80% 매출을 달성하는 고객 비율
         - 결과: 상위 몇 %가 80% 매출 달성하는지
         """,
-        hint="""
-        **힌트:**
-        1. 고객별 매출 계산 및 순위 부여
-        2. 누적 매출 계산 (윈도우 함수)
-        3. 전체 대비 누적 비율 계산
-        4. 80% 도달 시점 찾기
-
-        ```sql
-        SUM(monetary) OVER (ORDER BY monetary DESC) as cumulative_revenue
-        ```
-        """,
+        hint="""고객별 매출을 내림차순 정렬하고, 누적 매출과 누적 고객 비율을 계산하여 80% 도달 시점을 찾습니다.
+---
+필요한 함수: ROW_NUMBER() OVER, SUM() OVER, COUNT() OVER, ROUND(), WHERE 필터링
+---
+WITH customer_revenue AS (...),
+ranked AS (
+    SELECT
+        customer_id, monetary,
+        ROW_NUMBER() OVER (ORDER BY monetary DESC) as rank,
+        SUM(monetary) OVER (ORDER BY monetary DESC) as cumulative_revenue,
+        SUM(monetary) OVER () as total_revenue,
+        COUNT(*) OVER () as total_customers
+    FROM customer_revenue
+)
+-- cumulative_pct >= 80인 첫 번째 행 찾기""",
         answer_query="""
 WITH customer_revenue AS (
     SELECT
@@ -364,14 +366,21 @@ LIMIT 1
         - 세그먼트 이동 매트릭스 (from_segment → to_segment)
         - 이동 고객 수
         """,
-        hint="""
-        **힌트:**
-        1. 5월 기준 RFM 계산 (기준일: 2024-05-31)
-        2. 6월 기준 RFM 계산 (기준일: 2024-06-30)
-        3. 두 결과를 JOIN하여 이동 분석
-
-        두 개의 큰 CTE가 필요합니다.
-        """,
+        hint="""5월과 6월 각각의 RFM 세그먼트를 계산하고 JOIN하여 세그먼트 이동을 분석합니다.
+---
+필요한 함수: NTILE(5), CASE WHEN, JOIN, WHERE (날짜 필터), COUNT(*), GROUP BY
+---
+WITH rfm_may AS (
+    SELECT customer_id, NTILE(5) OVER(...) as r, f, m
+    FROM transactions WHERE transaction_date <= '2024-05-31'
+    GROUP BY customer_id
+),
+segment_may AS (... CASE WHEN으로 세그먼트 분류 ...),
+rfm_june AS (... 동일하게 6월 기준 ...),
+segment_june AS (...)
+SELECT from_segment, to_segment, COUNT(*)
+FROM segment_may JOIN segment_june
+WHERE segment_may != segment_june""",
         answer_query="""
 WITH rfm_may AS (
     SELECT

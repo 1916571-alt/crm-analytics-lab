@@ -26,19 +26,16 @@ QUESTIONS = [
         - 결과 컬럼: cohort_month, customer_count
         - 가입월 순으로 정렬
         """,
-        hint="""
-        **힌트:**
-        - strftime('%Y-%m', signup_date)로 년-월 추출
-        - customers 테이블 사용
-
-        ```sql
-        SELECT
-            strftime('%Y-%m', signup_date) as cohort_month,
-            COUNT(*) as customer_count
-        FROM customers
-        ...
-        ```
-        """,
+        hint="""고객의 가입일에서 년-월을 추출하여 코호트를 정의하고, 각 코호트별 고객 수를 집계합니다.
+---
+필요한 함수: strftime('%Y-%m', date), COUNT(*), GROUP BY, ORDER BY
+---
+SELECT
+    strftime('%Y-%m', signup_date) as cohort_month,
+    COUNT(*) as customer_count
+FROM customers
+GROUP BY ...
+ORDER BY ...""",
         answer_query="""
 SELECT
     strftime('%Y-%m', signup_date) as cohort_month,
@@ -83,23 +80,20 @@ ORDER BY cohort_month
         - 코호트별 평균 기간
         - 결과 컬럼: cohort_month, avg_days_to_first_purchase
         """,
-        hint="""
-        **힌트:**
-        1. 고객별 첫 구매일: MIN(transaction_date)
-        2. 기간 계산: julianday(첫구매일) - julianday(가입일)
-        3. 코호트별 평균 계산
-
-        ```sql
-        WITH first_purchase AS (
-            SELECT
-                customer_id,
-                MIN(transaction_date) as first_purchase_date
-            FROM transactions
-            GROUP BY customer_id
-        )
-        ...
-        ```
-        """,
+        hint="""고객별 첫 구매일을 구하고, 가입일과의 차이를 계산한 후 코호트별 평균을 구합니다.
+---
+필요한 함수: MIN(), julianday(), AVG(), ROUND(), CTE(WITH절), JOIN
+---
+WITH first_purchase AS (
+    SELECT customer_id, MIN(transaction_date) as first_purchase_date
+    FROM transactions
+    GROUP BY customer_id
+)
+SELECT
+    strftime('%Y-%m', c.signup_date) as cohort_month,
+    ROUND(AVG(julianday(fp.first_purchase_date) - julianday(c.signup_date)), 1) as avg_days
+FROM customers c
+JOIN first_purchase fp ON ...""",
         answer_query="""
 WITH first_purchase AS (
     SELECT
@@ -155,18 +149,15 @@ ORDER BY cohort_month
         - M+1 리텐션율 (%)
         - 결과 컬럼: cohort_month, total_customers, m1_customers, m1_retention
         """,
-        hint="""
-        **힌트:**
-        1. 고객의 코호트월 계산
-        2. 거래의 월 계산
-        3. 거래월 - 코호트월 = 1인 고객 수 집계
+        hint="""코호트별 전체 고객 수와 M+1(가입 다음 달)에 구매한 고객 수를 구해 리텐션율을 계산합니다.
+---
+필요한 함수: strftime(), COUNT(DISTINCT), COALESCE(), 월 차이 계산식, LEFT JOIN
+---
+-- 월 차이 계산 공식:
+(strftime('%Y', t.transaction_date) - strftime('%Y', c.signup_date)) * 12 +
+(strftime('%m', t.transaction_date) - strftime('%m', c.signup_date)) as month_diff
 
-        ```sql
-        -- 월 차이 계산
-        (strftime('%Y', t.transaction_date) - strftime('%Y', c.signup_date)) * 12 +
-        (strftime('%m', t.transaction_date) - strftime('%m', c.signup_date))
-        ```
-        """,
+-- month_diff = 1인 고객을 집계하여 M+1 리텐션 계산""",
         answer_query="""
 WITH customer_cohort AS (
     SELECT
@@ -248,18 +239,19 @@ ORDER BY cs.cohort_month
         - 리텐션 = 해당 월 활성 고객 / 코호트 전체 고객 × 100
         - 결과: 코호트별 월간 리텐션 (히트맵용 데이터)
         """,
-        hint="""
-        **힌트:**
-        1. 코호트별, 월차이별 활성 고객 수 계산
-        2. 코호트 전체 고객 수로 나누어 리텐션 계산
-        3. PIVOT 형태로 변환 (CASE WHEN 활용)
-
-        ```sql
-        MAX(CASE WHEN month_diff = 0 THEN retention END) as m0,
-        MAX(CASE WHEN month_diff = 1 THEN retention END) as m1,
-        ...
-        ```
-        """,
+        hint="""코호트별, 경과월별 활성 고객 비율을 계산하고 PIVOT 형태로 변환합니다.
+---
+필요한 함수: COUNT(DISTINCT), ROUND(), CASE WHEN, MAX(), GROUP BY, CTE 여러 개
+---
+-- 리텐션 계산 후 PIVOT 변환:
+SELECT
+    cohort_month,
+    MAX(CASE WHEN month_diff = 0 THEN retention_rate END) as m0,
+    MAX(CASE WHEN month_diff = 1 THEN retention_rate END) as m1,
+    MAX(CASE WHEN month_diff = 2 THEN retention_rate END) as m2,
+    ...
+FROM retention
+GROUP BY cohort_month""",
         answer_query="""
 WITH customer_cohort AS (
     SELECT
@@ -345,19 +337,17 @@ ORDER BY cohort_month
         - M+0 ~ M+5까지
         - 결과 컬럼: cohort_month, m0_revenue, m1_revenue, ..., m5_revenue
         """,
-        hint="""
-        **힌트:**
-        1. 코호트별, 경과월별 매출 집계
-        2. 윈도우 함수로 누적 합계 계산
-        3. PIVOT 형태로 변환
+        hint="""코호트별, 경과월별 매출을 집계하고 윈도우 함수로 누적 합계를 구한 후 PIVOT 형태로 변환합니다.
+---
+필요한 함수: SUM(), SUM() OVER(PARTITION BY ... ORDER BY ...), CASE WHEN, MAX()
+---
+-- 누적 매출 계산:
+SUM(revenue) OVER (
+    PARTITION BY cohort_month
+    ORDER BY month_diff
+) as cumulative_revenue
 
-        ```sql
-        SUM(monthly_revenue) OVER (
-            PARTITION BY cohort_month
-            ORDER BY month_diff
-        ) as cumulative_revenue
-        ```
-        """,
+-- 이후 CASE WHEN으로 PIVOT 변환""",
         answer_query="""
 WITH customer_cohort AS (
     SELECT
